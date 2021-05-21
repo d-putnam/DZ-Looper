@@ -12,6 +12,8 @@ import AVFoundation
 import AppKit
 import Photos
 
+
+// Custom class for assets
 class Asset: NSObject {
     var url: String
     var image: NSImageRep
@@ -22,8 +24,9 @@ class Asset: NSObject {
     }
 }
 
-class ViewController: NSViewController {
 
+class ViewController: NSViewController {
+    // Outlet defs
     @IBOutlet weak var selectedFileList: NSScrollView!
     @IBOutlet var scrollViewText: NSTextView!
     @IBOutlet weak var secPerImg: NSTextField!
@@ -37,12 +40,12 @@ class ViewController: NSViewController {
     @IBOutlet weak var fileTable: NSTableView!
     @IBOutlet weak var renderButton: NSButton!
     
-    var assetArray = [Asset]()
     
+    // Global variables for encoding settings
+    var assetArray = [Asset]()
     var loops = 2
     var secondsPerImage: TimeInterval = 1
     var overlay: Bool = true
-    
     var outputFrameSize = CGSize(width: 0, height: 0)
     var fps: Int32 = 24
     var ntsc: Bool = true
@@ -50,23 +53,15 @@ class ViewController: NSViewController {
     var frameTimeScale: Int32 = 23976
     
     
+    // Prevent window resizing
     override func viewDidAppear() {
         self.view.window?.styleMask = [.closable, .titled, .miniaturizable]
     }
     
+    
+    // Load user defaults on load if available
     override func viewDidLoad() {
         super.viewDidLoad()
-        // LOAD USER DEFAULTS
-        // Note: disabling remembered paths for sandboxed app
-        /*
-        if UserDefaults.standard.object(forKey: "lastOutputPath") != nil {
-            outputFilePathField.stringValue = UserDefaults().string(forKey: "lastOutputPath")!
-        }
-        if UserDefaults.standard.object(forKey: "overlayPath") != nil {
-            overlayFilePathField.stringValue = UserDefaults().string(forKey: "overlayPath")!
-        }
-        */
-        //selectedFileList.documentView.en
         if UserDefaults.standard.object(forKey: "fpsSelection") != nil {
             fpsMenu.selectItem(withTitle: (UserDefaults().string(forKey: "fpsSelection")!))
         }
@@ -82,6 +77,7 @@ class ViewController: NSViewController {
     }
     
     
+    // "Select Files" populates our asset array
     @IBAction func selectFiles(_ sender: Any) {
         scrollViewText.isEditable = true
         let dialog = NSOpenPanel();
@@ -96,12 +92,19 @@ class ViewController: NSViewController {
             var text = ""
             let textView : NSTextView? = selectedFileList?.documentView as? NSTextView
             textView?.string = text
+            assetArray = []
+            outputFrameSize = CGSize(width: 0, height: 0)
             for result in results {
                 text += result.path + "\n"
-                /*
-                let asset = Asset(url: result.path, image: NSImageRep(contentsOfFile: result.path)!)
+                let image = NSImageRep(contentsOfFile: result.path)
+                let asset = Asset(url: result.path, image: image!)
                 assetArray.append(asset)
-                */
+                if outputFrameSize.width == 0 {
+                    outputFrameSize.width = CGFloat(image!.pixelsWide)
+                }
+                if outputFrameSize.height == 0 {
+                    outputFrameSize.height = CGFloat(image!.pixelsHigh)
+                }
             }
             selectedFileList.documentView!.insertText(text)
         }
@@ -109,6 +112,7 @@ class ViewController: NSViewController {
     }
     
     
+    // Seconds Per Image field: prevent entries <0
     @IBAction func selectSeconds(_ sender: NSTextField) {
         if secPerImg.doubleValue <= Double(0) {
             secPerImg.doubleValue = Double(1)
@@ -117,6 +121,7 @@ class ViewController: NSViewController {
     }
     
     
+    // Number of Loops field: prevent entries <0 or decimal
     @IBAction func selectLoops(_ sender: NSTextField) {
         if loopNumber.intValue <= Int32(0) {
             loopNumber.intValue = 2
@@ -127,11 +132,13 @@ class ViewController: NSViewController {
     }
     
 
+    // Overlay toggle
     @IBAction func overlayToggle(_ sender: NSButton) {
         UserDefaults().set(overlayButton.state.rawValue, forKey: "overlayToggle")
     }
     
     
+    // Select overlay file
     @IBAction func selectOverlay(_ sender: NSButton) {
         let dialog = NSOpenPanel();
         dialog.title                   = "Select overlay image";
@@ -143,16 +150,17 @@ class ViewController: NSViewController {
         if (dialog.runModal() ==  NSApplication.ModalResponse.OK) {
             let results = dialog.url!.path
             overlayFilePathField.stringValue = results
-            //UserDefaults().set(results, forKey: "overlayPath")
         }
     }
     
     
+    // Select frames per second from drop-down
     @IBAction func fpsSelect(_ sender: NSPopUpButton) {
         UserDefaults().set(fpsMenu.titleOfSelectedItem, forKey: "fpsSelection")
     }
     
     
+    // Output selector
     @IBAction func selectOutput(_ sender: NSButton) {
         let dialog = NSSavePanel();
         dialog.title                     = "Choose output file";
@@ -161,18 +169,18 @@ class ViewController: NSViewController {
         dialog.allowedFileTypes          = ["mp4"]
         if (dialog.runModal() ==  NSApplication.ModalResponse.OK) {
             let results = dialog.url!.path
-            //UserDefaults().set(results, forKey: "lastOutputPath")
             outputFilePathField.stringValue = results
         }
     }
     
     
-    
+    // Called upon render -- all the magic is here:
     @IBAction func renderButtonAction(_ sender: NSButton) {
+        // Disable our button until process is finished
         renderButton.isEnabled = false
-        // get the output filepath from UI
+        // Get the output filepath from UI
         let filePathStringFromInputField = outputFilePathField.stringValue
-        // if output file exists, confirm overwrite
+        // If output file exists, confirm overwrite
         if !fileOverwriteAskContinue(path: filePathStringFromInputField) {
             self.renderButton.isEnabled = true
             return
@@ -180,43 +188,48 @@ class ViewController: NSViewController {
         let outputFileURL = URL(fileURLWithPath: filePathStringFromInputField)
         removeFileAtURLIfExists(url: outputFileURL)
         
+        // Set the rest of our output variables based on inputs
         refreshGlobalVariablesFromUI()
-        // exit if no input files parsed
+        // exit if no input assets parsed
         if assetArray.count == 0 {
+            genericAlert(message:"Select at least one input image!")
             self.renderButton.isEnabled = true
             return
         }
         
+        // Calculate our total number of frames
         let totalFrames = Double(assetArray.count) * secondsPerImage * Double(fps) * Double(loops)
         
+        // Get overlay info once before we run the render loop
         var overlayImg: NSImageRep
         var overlaySize = CGSize()
         var overlayRect = CGRect()
         var cgOverlay: CGImage?
         var overlayX = CGFloat()
         var overlayY = CGFloat()
-        if (self.overlay == true) {
+        olCheck: if (self.overlay == true) {
+            if (!FileManager.default.fileExists(atPath: overlayFilePathField.stringValue)) {
+                overlay = false
+                break olCheck
+            }
             overlayImg = NSImageRep(contentsOfFile: overlayFilePathField.stringValue)!
             overlaySize = CGSize(width: overlayImg.pixelsWide, height: overlayImg.pixelsHigh)
             overlayRect = CGRect(origin: CGPoint(x: 0, y: 0), size: overlaySize)
             cgOverlay = overlayImg.cgImage(forProposedRect: &overlayRect, context: NSGraphicsContext.current, hints: nil)!
             overlayX = self.outputFrameSize.width - overlaySize.width - 15
             overlayY = overlaySize.height
-            
-            if (overlayImg.pixelsWide > (assetArray[0].image.pixelsWide - 15) || overlayImg.pixelsHigh > assetArray[0].image.pixelsHigh) {
-                let overlaySizeAlert: NSAlert = NSAlert()
-                overlaySizeAlert.messageText = "Overlay image cannot be larger in width or height than the source image"
-                overlaySizeAlert.addButton(withTitle: "Ok")
-                overlaySizeAlert.runModal()
+            if (overlayImg.pixelsWide > (assetArray[0].image.pixelsWide) || overlayImg.pixelsHigh > assetArray[0].image.pixelsHigh) {
+                genericAlert(message: "Overlay image cannot be larger in width or height than the source image")
+                self.renderButton.isEnabled = true
                 return
             }
         }
         
-        
+        // Set our UI progress bar values
         progressBar.maxValue = totalFrames
         progressBar.doubleValue = 0
         
-        
+        // Initialize our AVAssetWriter
         guard let videoWriter = try? AVAssetWriter(outputURL: outputFileURL, fileType: AVFileType.mp4) else {
             fatalError("AVAssetWriter error")
         }
@@ -242,6 +255,7 @@ class ViewController: NSViewController {
                 var frameCounter: Int64 = 0
                 var imageCounter = 0
                 var appendSucceeded = true
+                var droppedFrameFlag = false
                 for frame in 1...Int(totalFrames) {
                     // Get the right image
                     if imageCounter == self.assetArray.count {
@@ -252,7 +266,7 @@ class ViewController: NSViewController {
                         imageCounter = imageCounter + 1
                     }
                     if (videoWriterInput.isReadyForMoreMediaData) {
-                        let lastFrameTime = self.ntsc ? CMTimeMake(value: frameCounter * self.frameTimeValue, timescale: self.frameTimeScale) : CMTimeMake(value: frameCounter, timescale: self.frameTimeScale)
+                        let lastFrameTime = CMTimeMake(value: frameCounter * self.frameTimeValue, timescale: self.frameTimeScale)
                         let presentationTime = CMTimeAdd(lastFrameTime, frameCMTime)
                         var pixelBuffer: CVPixelBuffer? = nil
                         let status: CVReturn = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pixelBufferAdaptor.pixelBufferPool!, &pixelBuffer)
@@ -271,12 +285,10 @@ class ViewController: NSViewController {
                             let y = newSize.height < self.outputFrameSize.height ? (self.outputFrameSize.height - newSize.height) / 2 : 0
                             var rect = CGRect(origin: CGPoint(x: 0, y: 0), size: self.outputFrameSize)
                             let cgImage: CGImage = image.cgImage(forProposedRect: &rect, context: NSGraphicsContext.current, hints: nil)!
-                            
                             context!.draw(cgImage, in: CGRect(x: x, y: y, width: newSize.width, height: newSize.height))
                             if (self.overlay == true) {
                                 context!.draw(cgOverlay!, in: CGRect(x: overlayX, y: overlayY, width: overlaySize.width, height: overlaySize.height))
                             }
-                            
                             CVPixelBufferUnlockBaseAddress(managedPixelBuffer, CVPixelBufferLockFlags(rawValue: CVOptionFlags(0)))
                             appendSucceeded = pixelBufferAdaptor.append(pixelBuffer, withPresentationTime: presentationTime)
                             frameCounter += 1
@@ -291,13 +303,18 @@ class ViewController: NSViewController {
                             print("Failed to allocate pixel buffer")
                             appendSucceeded = false
                         }
-                    } else {print("Not ready for frame")}
+                    } else {
+                        print("Not ready for frame")
+                        if !droppedFrameFlag {
+                            self.genericAlert(message: "Something may have went wrong, please QC output when finished")
+                            droppedFrameFlag = true
+                        }
+                    }
                     if !appendSucceeded {
                         self.renderButton.isEnabled = true
                         break
                     }
                 }
-                
                 videoWriterInput.markAsFinished()
                 videoWriter.finishWriting { () -> Void in
                     print("-----video1 url = \(outputFileURL)")
@@ -341,31 +358,21 @@ class ViewController: NSViewController {
     }
     
     
+    func genericAlert(message: String) {
+            let alert: NSAlert = NSAlert()
+            alert.messageText = "\(message as NSString)"
+            alert.addButton(withTitle: "Ok")
+            alert.runModal()
+    }
+    
+    
     func refreshGlobalVariablesFromUI() -> Void {
         loops = Int(loopNumber.intValue)
         secondsPerImage = secPerImg.doubleValue
         overlay = overlayButton.state.rawValue == 1 ? true : false
-        // parse images from the "select files" box
-        assetArray = []
-        outputFrameSize = CGSize(width: 0, height: 0)
-        var urlArray = [String]()
-        if let textFieldContent = selectedFileList.documentView as? NSTextView {
-            urlArray = textFieldContent.string.components(separatedBy: "\n")
-            urlArray.removeAll { $0 == "" }
-            for URL in urlArray {
-                let image = NSImageRep(contentsOfFile: URL)
-                let asset = Asset(url: URL, image: image!)
-                assetArray.append(asset)
-                if outputFrameSize.width == 0 {
-                    outputFrameSize.width = CGFloat(image!.pixelsWide)
-                }
-                if outputFrameSize.height == 0 {
-                    outputFrameSize.height = CGFloat(image!.pixelsHigh)
-                }
-            }
-        }
+                
         // update frame rate render settings
-        if fpsMenu.titleOfSelectedItem == "23.98 fps" {
+        if fpsMenu.titleOfSelectedItem == "23.976 fps" {
             fps = 24
             frameTimeValue = 1000
             frameTimeScale = 23976
