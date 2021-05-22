@@ -26,12 +26,15 @@ class Asset: NSObject {
 
 
 class ViewController: NSViewController {
-    // Outlet defs
+    
+    // IBOutlet Properties
     @IBOutlet weak var selectedFileList: NSScrollView!
     @IBOutlet var scrollViewText: NSTextView!
     @IBOutlet weak var secPerImg: NSTextField!
     @IBOutlet weak var fpsSelect: NSPopUpButton!
     @IBOutlet weak var fpsMenu: NSPopUpButton!
+    @IBOutlet weak var outputWidthOutlet: NSTextField!
+    @IBOutlet weak var outputHeightOutlet: NSTextField!
     @IBOutlet weak var overlayButton: NSButton!
     @IBOutlet weak var overlayFilePathField: NSTextField!
     @IBOutlet weak var outputFilePathField: NSTextField!
@@ -46,7 +49,7 @@ class ViewController: NSViewController {
     var loops = 2
     var secondsPerImage: TimeInterval = 1
     var overlay: Bool = true
-    var outputFrameSize = CGSize(width: 0, height: 0)
+    var outputFrameSize = CGSize(width: 1080, height: 1080)
     var fps: Int32 = 24
     var ntsc: Bool = true
     var frameTimeValue: Int64 = 1000
@@ -93,18 +96,13 @@ class ViewController: NSViewController {
             let textView : NSTextView? = selectedFileList?.documentView as? NSTextView
             textView?.string = text
             assetArray = []
-            outputFrameSize = CGSize(width: 0, height: 0)
+            //outputFrameSize = CGSize(width: 0, height: 0)
             for result in results {
                 text += result.path + "\n"
                 let image = NSImageRep(contentsOfFile: result.path)
                 let asset = Asset(url: result.path, image: image!)
                 assetArray.append(asset)
-                if outputFrameSize.width == 0 {
-                    outputFrameSize.width = CGFloat(image!.pixelsWide)
-                }
-                if outputFrameSize.height == 0 {
-                    outputFrameSize.height = CGFloat(image!.pixelsHigh)
-                }
+                
             }
             selectedFileList.documentView!.insertText(text)
         }
@@ -214,9 +212,10 @@ class ViewController: NSViewController {
             }
             overlayImg = NSImageRep(contentsOfFile: overlayFilePathField.stringValue)!
             overlaySize = CGSize(width: overlayImg.pixelsWide, height: overlayImg.pixelsHigh)
+            print(overlaySize)
             overlayRect = CGRect(origin: CGPoint(x: 0, y: 0), size: overlaySize)
             cgOverlay = overlayImg.cgImage(forProposedRect: &overlayRect, context: NSGraphicsContext.current, hints: nil)!
-            overlayX = self.outputFrameSize.width - overlaySize.width - 15
+            overlayX = self.outputFrameSize.width - overlaySize.width - 25
             overlayY = overlaySize.height
             if (overlayImg.pixelsWide > (assetArray[0].image.pixelsWide) || overlayImg.pixelsHigh > assetArray[0].image.pixelsHigh) {
                 genericAlert(message: "Overlay image cannot be larger in width or height than the source image")
@@ -370,6 +369,9 @@ class ViewController: NSViewController {
         loops = Int(loopNumber.intValue)
         secondsPerImage = secPerImg.doubleValue
         overlay = overlayButton.state.rawValue == 1 ? true : false
+        
+        outputFrameSize.width = CGFloat(outputWidthOutlet.intValue)
+        outputFrameSize.height = CGFloat(outputHeightOutlet.intValue)
                 
         // update frame rate render settings
         if fpsMenu.titleOfSelectedItem == "23.976 fps" {

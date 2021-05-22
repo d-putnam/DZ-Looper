@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E21C77562659844E002A9C97 /* DragDropTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = E21C77552659844E002A9C97 /* DragDropTextField.swift */; };
+		E21C77592659B526002A9C97 /* DragDropTokenField.swift in Sources */ = {isa = PBXBuildFile; fileRef = E21C77582659B526002A9C97 /* DragDropTokenField.swift */; };
 		E236DCFF26501B28009DBDD5 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E236DCFE26501B28009DBDD5 /* AppDelegate.swift */; };
 		E236DD0126501B28009DBDD5 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E236DD0026501B28009DBDD5 /* ViewController.swift */; };
 		E236DD0526501B29009DBDD5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E236DD0426501B29009DBDD5 /* Assets.xcassets */; };
@@ -14,6 +16,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		E21C77552659844E002A9C97 /* DragDropTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DragDropTextField.swift; sourceTree = "<group>"; };
+		E21C77582659B526002A9C97 /* DragDropTokenField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DragDropTokenField.swift; sourceTree = "<group>"; };
 		E236DCFB26501B28009DBDD5 /* DZ-Looper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "DZ-Looper.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E236DCFE26501B28009DBDD5 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		E236DD0026501B28009DBDD5 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
@@ -34,6 +38,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		E21C77572659B4DD002A9C97 /* Subclasses */ = {
+			isa = PBXGroup;
+			children = (
+				E21C77552659844E002A9C97 /* DragDropTextField.swift */,
+				E21C77582659B526002A9C97 /* DragDropTokenField.swift */,
+			);
+			path = Subclasses;
+			sourceTree = "<group>";
+		};
 		E236DCF226501B28009DBDD5 = {
 			isa = PBXGroup;
 			children = (
@@ -53,6 +66,7 @@
 		E236DCFD26501B28009DBDD5 /* DZ-Looper */ = {
 			isa = PBXGroup;
 			children = (
+				E21C77572659B4DD002A9C97 /* Subclasses */,
 				E236DD13265039E1009DBDD5 /* DZ-Looper.entitlements */,
 				E236DCFE26501B28009DBDD5 /* AppDelegate.swift */,
 				E236DD0026501B28009DBDD5 /* ViewController.swift */,
@@ -139,7 +153,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				E236DD0126501B28009DBDD5 /* ViewController.swift in Sources */,
+				E21C77562659844E002A9C97 /* DragDropTextField.swift in Sources */,
 				E236DCFF26501B28009DBDD5 /* AppDelegate.swift in Sources */,
+				E21C77592659B526002A9C97 /* DragDropTokenField.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
