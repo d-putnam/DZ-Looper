@@ -15,12 +15,14 @@ import Photos
 
 // Custom class for assets
 class Asset: NSObject {
-    var url: String
+    var url: URL
     var image: NSImageRep
+    var name: String
     
-    init(url: String, image: NSImageRep) {
+    init(url: URL, image: NSImageRep) {
         self.url = url
         self.image = image
+        self.name = url.lastPathComponent
     }
 }
 
@@ -28,10 +30,7 @@ class Asset: NSObject {
 class ViewController: NSViewController {
     
     // IBOutlet Properties
-    @IBOutlet weak var selectedFileList: NSScrollView!
-    @IBOutlet var scrollViewText: NSTextView!
     @IBOutlet weak var secPerImg: NSTextField!
-    @IBOutlet weak var fpsSelect: NSPopUpButton!
     @IBOutlet weak var fpsMenu: NSPopUpButton!
     @IBOutlet weak var outputWidthOutlet: NSTextField!
     @IBOutlet weak var outputHeightOutlet: NSTextField!
@@ -40,8 +39,10 @@ class ViewController: NSViewController {
     @IBOutlet weak var outputFilePathField: NSTextField!
     @IBOutlet weak var loopNumber: NSTextField!
     @IBOutlet weak var progressBar: NSProgressIndicator!
-    @IBOutlet weak var fileTable: NSTableView!
     @IBOutlet weak var renderButton: NSButton!
+    @IBOutlet weak var assetTokenField: NSTokenField!
+    @IBOutlet weak var overlayXPlacement: NSTextField!
+    @IBOutlet weak var overlayYPlacement: NSTextField!
     
     
     // Global variables for encoding settings
@@ -65,6 +66,9 @@ class ViewController: NSViewController {
     // Load user defaults on load if available
     override func viewDidLoad() {
         super.viewDidLoad()
+            
+        assetTokenField.delegate = self
+        
         if UserDefaults.standard.object(forKey: "fpsSelection") != nil {
             fpsMenu.selectItem(withTitle: (UserDefaults().string(forKey: "fpsSelection")!))
         }
@@ -77,12 +81,19 @@ class ViewController: NSViewController {
         if UserDefaults.standard.object(forKey: "loopNumber") != nil {
             loopNumber.intValue = Int32(UserDefaults().integer(forKey: "loopNumber"))
         }
+        if UserDefaults.standard.object(forKey: "overlayXPlacement") != nil {
+            overlayXPlacement.intValue = Int32(UserDefaults().integer(forKey: "overlayXPlacement"))
+        }
+        if UserDefaults.standard.object(forKey: "overlayYPlacement") != nil {
+            overlayYPlacement.intValue = Int32(UserDefaults().integer(forKey: "overlayYPlacement"))
+        }
     }
     
+    // MARK:- Actions For UI Elements
     
     // "Select Files" populates our asset array
     @IBAction func selectFiles(_ sender: Any) {
-        scrollViewText.isEditable = true
+        //scrollViewText.isEditable = true
         let dialog = NSOpenPanel();
         dialog.title                   = "Choose multiple files";
         dialog.showsResizeIndicator    = true;
@@ -92,21 +103,14 @@ class ViewController: NSViewController {
         dialog.allowedFileTypes        = ["tif", "png", "jpg", "jpeg", "gif"];
         if (dialog.runModal() ==  NSApplication.ModalResponse.OK) {
             let results = dialog.urls
-            var text = ""
-            let textView : NSTextView? = selectedFileList?.documentView as? NSTextView
-            textView?.string = text
-            assetArray = []
-            //outputFrameSize = CGSize(width: 0, height: 0)
             for result in results {
-                text += result.path + "\n"
                 let image = NSImageRep(contentsOfFile: result.path)
-                let asset = Asset(url: result.path, image: image!)
+                let asset = Asset(url: result, image: image!)
                 assetArray.append(asset)
-                
             }
-            selectedFileList.documentView!.insertText(text)
+            let labelArray = assetArray.map { $0.name }
+            assetTokenField.objectValue = labelArray
         }
-        scrollViewText.isEditable = false
     }
     
     
@@ -133,6 +137,15 @@ class ViewController: NSViewController {
     // Overlay toggle
     @IBAction func overlayToggle(_ sender: NSButton) {
         UserDefaults().set(overlayButton.state.rawValue, forKey: "overlayToggle")
+    }
+    
+    
+    @IBAction func placementXSelect(_ sender: NSTextField) {
+        UserDefaults().set(overlayXPlacement.intValue, forKey: "overlayXPlacement")
+    }
+    
+    @IBAction func placementYSelect(_ sender: NSTextField) {
+        UserDefaults().set(overlayYPlacement.intValue, forKey: "overlayYPlacement")
     }
     
     
@@ -172,8 +185,22 @@ class ViewController: NSViewController {
     }
     
     
+
+    // MARK:- Render Action (sorry for the mess)
+
     // Called upon render -- all the magic is here:
     @IBAction func renderButtonAction(_ sender: NSButton) {
+        var arrangedArray = [Asset]()
+        for token in assetTokenField?.objectValue as! NSArray {
+            for asset in assetArray {
+                if asset.name == token as? String {
+                    arrangedArray.append(asset)
+                }
+            }
+            print("token: ",token)
+        }
+        print(arrangedArray)
+        
         // Disable our button until process is finished
         renderButton.isEnabled = false
         // Get the output filepath from UI
@@ -189,14 +216,14 @@ class ViewController: NSViewController {
         // Set the rest of our output variables based on inputs
         refreshGlobalVariablesFromUI()
         // exit if no input assets parsed
-        if assetArray.count == 0 {
+        if arrangedArray.count == 0 {
             genericAlert(message:"Select at least one input image!")
             self.renderButton.isEnabled = true
             return
         }
         
         // Calculate our total number of frames
-        let totalFrames = Double(assetArray.count) * secondsPerImage * Double(fps) * Double(loops)
+        let totalFrames = Double(arrangedArray.count) * secondsPerImage * Double(fps) * Double(loops)
         
         // Get overlay info once before we run the render loop
         var overlayImg: NSImageRep
@@ -212,12 +239,11 @@ class ViewController: NSViewController {
             }
             overlayImg = NSImageRep(contentsOfFile: overlayFilePathField.stringValue)!
             overlaySize = CGSize(width: overlayImg.pixelsWide, height: overlayImg.pixelsHigh)
-            print(overlaySize)
             overlayRect = CGRect(origin: CGPoint(x: 0, y: 0), size: overlaySize)
             cgOverlay = overlayImg.cgImage(forProposedRect: &overlayRect, context: NSGraphicsContext.current, hints: nil)!
-            overlayX = self.outputFrameSize.width - overlaySize.width - 25
-            overlayY = overlaySize.height
-            if (overlayImg.pixelsWide > (assetArray[0].image.pixelsWide) || overlayImg.pixelsHigh > assetArray[0].image.pixelsHigh) {
+            overlayX = self.outputFrameSize.width - overlaySize.width - CGFloat(overlayXPlacement.intValue)
+            overlayY = CGFloat(overlayYPlacement.intValue)
+            if (overlayImg.pixelsWide > (arrangedArray[0].image.pixelsWide) || overlayImg.pixelsHigh > arrangedArray[0].image.pixelsHigh) {
                 genericAlert(message: "Overlay image cannot be larger in width or height than the source image")
                 self.renderButton.isEnabled = true
                 return
@@ -257,10 +283,10 @@ class ViewController: NSViewController {
                 var droppedFrameFlag = false
                 for frame in 1...Int(totalFrames) {
                     // Get the right image
-                    if imageCounter == self.assetArray.count {
+                    if imageCounter == arrangedArray.count {
                         imageCounter = 0
                     }
-                    let image = self.assetArray[imageCounter].image
+                    let image = arrangedArray[imageCounter].image
                     if frame % Int(floor(Double(self.fps) * self.secondsPerImage)) == 0 {
                         imageCounter = imageCounter + 1
                     }
@@ -326,6 +352,9 @@ class ViewController: NSViewController {
     }
     
     
+    
+    // MARK:- Helpers used in Render function
+
     func removeFileAtURLIfExists(url: URL) {
         let filePath = url.path
         let fileManager = FileManager.default
@@ -337,6 +366,14 @@ class ViewController: NSViewController {
             }
         }
         
+    }
+    
+    
+    func genericAlert(message: String) {
+            let alert: NSAlert = NSAlert()
+            alert.messageText = "\(message as NSString)"
+            alert.addButton(withTitle: "Ok")
+            alert.runModal()
     }
     
     
@@ -354,14 +391,6 @@ class ViewController: NSViewController {
             }
         }
         return response
-    }
-    
-    
-    func genericAlert(message: String) {
-            let alert: NSAlert = NSAlert()
-            alert.messageText = "\(message as NSString)"
-            alert.addButton(withTitle: "Ok")
-            alert.runModal()
     }
     
     
@@ -396,6 +425,31 @@ class ViewController: NSViewController {
             ntsc = false
         }
     }
-    
 }
 
+
+
+// MARK:- NSTokenFieldDelegate
+
+
+extension ViewController: NSTokenFieldDelegate {
+    
+    func tokenField(_ tokenField: NSTokenField,
+    shouldAdd tokens: [Any],
+    at index: Int) -> [Any] {
+        let labelArray = assetArray.map { $0.name }
+        var flag = false
+        for token in tokens {
+            if labelArray.contains(String(describing: token)) {
+                flag = true
+            } else {
+                flag = false
+            }
+        }
+        if !flag {
+            return []
+        } else {
+            return tokens as! [String]
+        }
+    }
+}
