@@ -446,7 +446,9 @@ extension ViewController: NSTokenFieldDelegate {
     func tokenField(_ tokenField: NSTokenField,
     shouldAdd tokens: [Any],
     at index: Int) -> [Any] {
-        let labelArray = assetTokenField.returnAssets().map { $0.name }
+        let labelArray = assetTokenField.returnAssets().map {
+            $0.name.count < 20 ? $0.name : $0.name.prefix(15) + "..." + $0.name.suffix(15)
+        }
         var flag = false
         for token in tokens {
             if labelArray.contains(String(describing: token)) {
@@ -468,7 +470,7 @@ extension ViewController: NSTokenFieldDelegate {
     func tokenField(_ tokenField: NSTokenField,
                     displayStringForRepresentedObject representedObject: Any) -> String? {
         let string = representedObject as! String
-        if string.count < 30 {
+        if string.count < 20 {
             return string
         } else {
             let first15 = string.prefix(15)

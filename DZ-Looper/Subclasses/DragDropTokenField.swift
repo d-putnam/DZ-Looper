@@ -29,7 +29,6 @@ class DragDropTokenField: NSTokenField {
         
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         let canReadPasteboardObjects = sender.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: nil)
-        print("draggingEntered")
         if canReadPasteboardObjects {
             highlight()
             return .copy
