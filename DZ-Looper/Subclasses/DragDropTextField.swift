@@ -9,6 +9,7 @@
 import Cocoa
 
 class mp4DropField: DragDropTextField {
+    
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         guard let pasteboardObjects = sender.draggingPasteboard.readObjects(forClasses: [NSImage.self, NSColor.self, NSString.self, NSURL.self], options: nil), pasteboardObjects.count > 0 else { return false }
         let url = pasteboardObjects[0] as! URL
@@ -57,9 +58,9 @@ class DragDropTextField: NSTextField {
         unhighlight()
     }
      
-     
     override func draggingExited(_ sender: NSDraggingInfo?) {
         unhighlight()
+        print("exit")
     }
     
     func highlight() {

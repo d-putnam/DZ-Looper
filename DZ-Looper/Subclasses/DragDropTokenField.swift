@@ -10,21 +10,25 @@ import Cocoa
 
 class DragDropTokenField: NSTokenField {
 
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-
-        // Drawing code here.
+    let supportedTypes: [NSPasteboard.PasteboardType] = [.fileURL]
+    
+    var assets: [Asset] = []
+    
+    func returnAssets() -> [Asset] {
+        return assets
     }
     
-    let supportedTypes: [NSPasteboard.PasteboardType] = [.fileURL]
+    func appendAsset(asset: Asset) {
+        assets.append(asset)
+    }
     
     override func awakeFromNib() {
         super.awakeFromNib()
         self.registerForDraggedTypes(supportedTypes)
     }
-    
+        
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        let canReadPasteboardObjects = sender.draggingPasteboard.canReadObject(forClasses: [NSImage.self, NSURL.self], options: nil)
+        let canReadPasteboardObjects = sender.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: nil)
         print("draggingEntered")
         if canReadPasteboardObjects {
             highlight()
@@ -38,34 +42,46 @@ class DragDropTokenField: NSTokenField {
         return NSDragOperation()
     }
     
-    override func draggingExited(_ sender: NSDraggingInfo?) {
-        print("EXITED")
-
-        super.draggingExited(sender)
-    }
-
     override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
         print("PREPARE")
 
-        return super.prepareForDragOperation(sender)
+        return true
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        NSLog("PERFORM")
-
-        return super.performDragOperation(sender)
+        unhighlight()
+        print("PERFORM")
+        guard let pasteboardObjects = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: nil), pasteboardObjects.count > 0 else { return false }
+        var labelArray = [String]()
+        if (self.objectValue as? [String] != nil) {
+            var original_array = self.objectValue as! [String]
+            for obj in original_array {
+                labelArray.append(obj)
+            }
+        }
+        for object in pasteboardObjects {
+            let url = object as! URL
+            let asset = Asset(url: url, image: NSImageRep(contentsOf: url)!)
+            assets.append(asset)
+            labelArray.append(asset.name)
+        }
+        self.objectValue = labelArray
+        return true
     }
 
     override func concludeDragOperation(_ sender: NSDraggingInfo?) {
-        NSLog("CONCLUDE")
-
-        super.concludeDragOperation(sender)
+        unhighlight()
+        print("CONCLUDE")
     }
 
-    override func draggingEnded(_ sender: NSDraggingInfo?) {
-        NSLog("ENDED")
-
-        super.draggingEnded(sender!)
+    override func draggingEnded(_ sender: NSDraggingInfo) {
+        unhighlight()
+        print("ended")
+    }
+     
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        unhighlight()
+        print("exit")
     }
     
     func highlight() {

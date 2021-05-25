@@ -40,13 +40,11 @@ class ViewController: NSViewController {
     @IBOutlet weak var loopNumber: NSTextField!
     @IBOutlet weak var progressBar: NSProgressIndicator!
     @IBOutlet weak var renderButton: NSButton!
-    @IBOutlet weak var assetTokenField: NSTokenField!
     @IBOutlet weak var overlayXPlacement: NSTextField!
     @IBOutlet weak var overlayYPlacement: NSTextField!
-    
+    @IBOutlet weak var assetTokenField: DragDropTokenField!
     
     // Global variables for encoding settings
-    var assetArray = [Asset]()
     var loops = 2
     var secondsPerImage: TimeInterval = 1
     var overlay: Bool = true
@@ -91,9 +89,8 @@ class ViewController: NSViewController {
     
     // MARK:- Actions For UI Elements
     
-    // "Select Files" populates our asset array
+    // "Select Files" adds to our asset array (stored in our token field)
     @IBAction func selectFiles(_ sender: Any) {
-        //scrollViewText.isEditable = true
         let dialog = NSOpenPanel();
         dialog.title                   = "Choose multiple files";
         dialog.showsResizeIndicator    = true;
@@ -103,12 +100,19 @@ class ViewController: NSViewController {
         dialog.allowedFileTypes        = ["tif", "png", "jpg", "jpeg", "gif"];
         if (dialog.runModal() ==  NSApplication.ModalResponse.OK) {
             let results = dialog.urls
+            var labelArray = [String]()
+            if (assetTokenField.objectValue as? [String] != nil) {
+                var original_array = assetTokenField.objectValue as! [String]
+                for obj in original_array {
+                    labelArray.append(obj)
+                }
+            }
             for result in results {
                 let image = NSImageRep(contentsOfFile: result.path)
                 let asset = Asset(url: result, image: image!)
-                assetArray.append(asset)
+                assetTokenField.appendAsset(asset: asset)
+                labelArray.append(asset.name)
             }
-            let labelArray = assetArray.map { $0.name }
             assetTokenField.objectValue = labelArray
         }
     }
@@ -139,7 +143,7 @@ class ViewController: NSViewController {
         UserDefaults().set(overlayButton.state.rawValue, forKey: "overlayToggle")
     }
     
-    
+    // Overlay placement from bottom right corner
     @IBAction func placementXSelect(_ sender: NSTextField) {
         UserDefaults().set(overlayXPlacement.intValue, forKey: "overlayXPlacement")
     }
@@ -190,21 +194,22 @@ class ViewController: NSViewController {
 
     // Called upon render -- all the magic is here:
     @IBAction func renderButtonAction(_ sender: NSButton) {
+        // Disable our button until process is finished
+        renderButton.isEnabled = false
+        
+        // Arrange our assets in order of the tokens
         var arrangedArray = [Asset]()
         for token in assetTokenField?.objectValue as! NSArray {
-            for asset in assetArray {
+            for asset in assetTokenField.returnAssets() {
                 if asset.name == token as? String {
                     arrangedArray.append(asset)
                 }
             }
-            print("token: ",token)
         }
-        print(arrangedArray)
         
-        // Disable our button until process is finished
-        renderButton.isEnabled = false
         // Get the output filepath from UI
         let filePathStringFromInputField = outputFilePathField.stringValue
+        
         // If output file exists, confirm overwrite
         if !fileOverwriteAskContinue(path: filePathStringFromInputField) {
             self.renderButton.isEnabled = true
@@ -215,6 +220,7 @@ class ViewController: NSViewController {
         
         // Set the rest of our output variables based on inputs
         refreshGlobalVariablesFromUI()
+        
         // exit if no input assets parsed
         if arrangedArray.count == 0 {
             genericAlert(message:"Select at least one input image!")
@@ -224,6 +230,10 @@ class ViewController: NSViewController {
         
         // Calculate our total number of frames
         let totalFrames = Double(arrangedArray.count) * secondsPerImage * Double(fps) * Double(loops)
+        
+        // Set our UI progress bar values
+        progressBar.maxValue = totalFrames
+        progressBar.doubleValue = 0
         
         // Get overlay info once before we run the render loop
         var overlayImg: NSImageRep
@@ -250,11 +260,7 @@ class ViewController: NSViewController {
             }
         }
         
-        // Set our UI progress bar values
-        progressBar.maxValue = totalFrames
-        progressBar.doubleValue = 0
-        
-        // Initialize our AVAssetWriter
+        // Set up our AVAssetWriter
         guard let videoWriter = try? AVAssetWriter(outputURL: outputFileURL, fileType: AVFileType.mp4) else {
             fatalError("AVAssetWriter error")
         }
@@ -304,7 +310,7 @@ class ViewController: NSViewController {
                             context!.clear(CGRect(x: 0, y: 0, width: CGFloat(self.outputFrameSize.width), height: CGFloat(self.outputFrameSize.height)))
                             let horizontalRatio = CGFloat(self.outputFrameSize.width) / image.size.width
                             let verticalRatio = CGFloat(self.outputFrameSize.height) / image.size.height
-                            let aspectRatio = min(horizontalRatio, verticalRatio) // ScaleAspectFit
+                            let aspectRatio = min(horizontalRatio, verticalRatio)
                             let newSize: CGSize = CGSize(width: image.size.width * aspectRatio, height: image.size.height * aspectRatio)
                             let x = newSize.width < self.outputFrameSize.width ? (self.outputFrameSize.width - newSize.width) / 2 : 0
                             let y = newSize.height < self.outputFrameSize.height ? (self.outputFrameSize.height - newSize.height) / 2 : 0
@@ -323,7 +329,7 @@ class ViewController: NSViewController {
                                     self.progressBar.doubleValue = 0
                                 }
                             }
-                            usleep(useconds_t(50000))
+                            usleep(useconds_t(5000))
                         } else {
                             print("Failed to allocate pixel buffer")
                             appendSucceeded = false
@@ -437,19 +443,22 @@ extension ViewController: NSTokenFieldDelegate {
     func tokenField(_ tokenField: NSTokenField,
     shouldAdd tokens: [Any],
     at index: Int) -> [Any] {
-        let labelArray = assetArray.map { $0.name }
+        let labelArray = assetTokenField.returnAssets().map { $0.name }
         var flag = false
         for token in tokens {
             if labelArray.contains(String(describing: token)) {
                 flag = true
             } else {
+                print("false")
                 flag = false
             }
         }
+        print("repsonding to ShouldAdd")
         if !flag {
             return []
         } else {
             return tokens as! [String]
         }
     }
+    
 }
