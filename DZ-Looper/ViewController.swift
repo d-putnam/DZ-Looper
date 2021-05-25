@@ -102,7 +102,7 @@ class ViewController: NSViewController {
             let results = dialog.urls
             var labelArray = [String]()
             if (assetTokenField.objectValue as? [String] != nil) {
-                var original_array = assetTokenField.objectValue as! [String]
+                let original_array = assetTokenField.objectValue as! [String]
                 for obj in original_array {
                     labelArray.append(obj)
                 }
@@ -296,6 +296,10 @@ class ViewController: NSViewController {
                     if frame % Int(floor(Double(self.fps) * self.secondsPerImage)) == 0 {
                         imageCounter = imageCounter + 1
                     }
+                    while !videoWriterInput.isReadyForMoreMediaData {
+                        print("Sleeping to catch up")
+                        usleep(useconds_t(50000))
+                    }
                     if (videoWriterInput.isReadyForMoreMediaData) {
                         let lastFrameTime = CMTimeMake(value: frameCounter * self.frameTimeValue, timescale: self.frameTimeScale)
                         let presentationTime = CMTimeAdd(lastFrameTime, frameCMTime)
@@ -329,7 +333,6 @@ class ViewController: NSViewController {
                                     self.progressBar.doubleValue = 0
                                 }
                             }
-                            usleep(useconds_t(5000))
                         } else {
                             print("Failed to allocate pixel buffer")
                             appendSucceeded = false
@@ -461,4 +464,18 @@ extension ViewController: NSTokenFieldDelegate {
         }
     }
     
+    // return middle-truncated string for long filenames
+    func tokenField(_ tokenField: NSTokenField,
+                    displayStringForRepresentedObject representedObject: Any) -> String? {
+        let string = representedObject as! String
+        if string.count < 30 {
+            return string
+        } else {
+            let first15 = string.prefix(15)
+            let last15 = "..." + string.suffix(15)
+            return String(first15 + last15)
+        }
+    }
+    
 }
+

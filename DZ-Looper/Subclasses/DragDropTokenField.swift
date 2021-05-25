@@ -9,7 +9,7 @@
 import Cocoa
 
 class DragDropTokenField: NSTokenField {
-
+    
     let supportedTypes: [NSPasteboard.PasteboardType] = [.fileURL]
     
     var assets: [Asset] = []
@@ -54,7 +54,7 @@ class DragDropTokenField: NSTokenField {
         guard let pasteboardObjects = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: nil), pasteboardObjects.count > 0 else { return false }
         var labelArray = [String]()
         if (self.objectValue as? [String] != nil) {
-            var original_array = self.objectValue as! [String]
+            let original_array = self.objectValue as! [String]
             for obj in original_array {
                 labelArray.append(obj)
             }
