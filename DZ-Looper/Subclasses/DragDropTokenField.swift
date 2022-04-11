@@ -19,7 +19,15 @@ class DragDropTokenField: NSTokenField {
     }
     
     func appendAsset(asset: Asset) {
-        assets.append(asset)
+        var flag = false
+        for assetSource in assets {
+            if assetSource.name == asset.name {
+                flag = true
+            }
+        }
+        if flag == false {
+            assets.append(asset)
+        }
     }
     
     override func awakeFromNib() {
@@ -37,19 +45,15 @@ class DragDropTokenField: NSTokenField {
     }
     
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
-        print("UPDATED")
         return NSDragOperation()
     }
     
     override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        print("PREPARE")
-
         return true
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         unhighlight()
-        print("PERFORM")
         guard let pasteboardObjects = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: nil), pasteboardObjects.count > 0 else { return false }
         var labelArray = [String]()
         if (self.objectValue as? [String] != nil) {
@@ -61,26 +65,24 @@ class DragDropTokenField: NSTokenField {
         for object in pasteboardObjects {
             let url = object as! URL
             let asset = Asset(url: url, image: NSImageRep(contentsOf: url)!)
-            assets.append(asset)
+            appendAsset(asset: asset)
             labelArray.append(asset.name)
         }
         self.objectValue = labelArray
+
         return true
     }
 
     override func concludeDragOperation(_ sender: NSDraggingInfo?) {
         unhighlight()
-        print("CONCLUDE")
     }
 
     override func draggingEnded(_ sender: NSDraggingInfo) {
         unhighlight()
-        print("ended")
     }
      
     override func draggingExited(_ sender: NSDraggingInfo?) {
         unhighlight()
-        print("exit")
     }
     
     func highlight() {

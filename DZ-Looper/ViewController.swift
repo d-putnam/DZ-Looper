@@ -113,6 +113,7 @@ class ViewController: NSViewController {
                 assetTokenField.appendAsset(asset: asset)
                 labelArray.append(asset.name)
             }
+
             assetTokenField.objectValue = labelArray
         }
     }
@@ -180,7 +181,7 @@ class ViewController: NSViewController {
         let dialog = NSSavePanel();
         dialog.title                     = "Choose output file";
         dialog.nameFieldStringValue      = "output.mp4";
-        dialog.directoryURL              = URL(string: NSHomeDirectory() + "/Desktop")
+        dialog.directoryURL              = URL(string: NSHomeDirectory())
         dialog.allowedFileTypes          = ["mp4"]
         if (dialog.runModal() ==  NSApplication.ModalResponse.OK) {
             let results = dialog.url!.path
@@ -199,15 +200,38 @@ class ViewController: NSViewController {
         
         // Arrange our assets in order of the tokens
         var arrangedArray = [Asset]()
+        if (assetTokenField?.objectValue as? NSArray) == nil {
+            genericAlert(message:"Please select input items!")
+            self.renderButton.isEnabled = true
+            return
+        }
         for token in assetTokenField?.objectValue as! NSArray {
+            NSLog("tokens: %@", token as! String)
             for asset in assetTokenField.returnAssets() {
+                NSLog("assets: %@", asset.name)
                 if asset.name == token as? String {
                     arrangedArray.append(asset)
                 }
+                else if asset.name.count > 30 {
+                    let first15 = asset.name.prefix(15)
+                    let last15 = "..." + asset.name.suffix(15)
+                    if String(first15 + last15) == token as? String {
+                        arrangedArray.append(asset)
+                    }
+                }
             }
         }
+        for x in arrangedArray {
+            NSLog("arranged: %@", x.name)
+        }
+        
         
         // Get the output filepath from UI
+        if outputFilePathField.stringValue == "" {
+            genericAlert(message:"Please select an output path!")
+            self.renderButton.isEnabled = true
+            return
+        }
         let filePathStringFromInputField = outputFilePathField.stringValue
         
         // If output file exists, confirm overwrite
@@ -352,7 +376,6 @@ class ViewController: NSViewController {
                 videoWriterInput.markAsFinished()
                 videoWriter.finishWriting { () -> Void in
                     print("-----video1 url = \(outputFileURL)")
-                    print(outputFileURL)
                     NSWorkspace.shared.activateFileViewerSelecting([outputFileURL])
                 }
             })
@@ -447,18 +470,17 @@ extension ViewController: NSTokenFieldDelegate {
     shouldAdd tokens: [Any],
     at index: Int) -> [Any] {
         let labelArray = assetTokenField.returnAssets().map {
-            $0.name.count < 20 ? $0.name : $0.name.prefix(15) + "..." + $0.name.suffix(15)
+            $0.name.count < 31 ? $0.name : $0.name.prefix(15) + "..." + $0.name.suffix(15)
         }
+
         var flag = false
         for token in tokens {
             if labelArray.contains(String(describing: token)) {
                 flag = true
             } else {
-                print("false")
                 flag = false
             }
         }
-        print("repsonding to ShouldAdd")
         if !flag {
             return []
         } else {
@@ -470,7 +492,7 @@ extension ViewController: NSTokenFieldDelegate {
     func tokenField(_ tokenField: NSTokenField,
                     displayStringForRepresentedObject representedObject: Any) -> String? {
         let string = representedObject as! String
-        if string.count < 20 {
+        if string.count < 31 {
             return string
         } else {
             let first15 = string.prefix(15)
